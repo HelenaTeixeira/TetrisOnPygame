@@ -213,18 +213,58 @@ def draw_grid(surface, grid):
 
 
 def clear_rows(grid, locked):
-    pass
+    inc=0                                   #indica quantas rows foram apagadas para o shift
+    for i in range(len(grid)-1,-1,-1):      #loop througth grid backwards
+        row=grid[i]
+        if(0,0,0) not in row:               # esta toda a linha pintada
+            inc+=1
+            ind=i
+            for j in range(len(row)):
+                try:
+                    del locked[(j,i)]               #apaga a linha completada
+                except:
+                    continue
+    if inc>0:
+        for key in sorted(list(locked), key=lambda x:x[1])[::-1]:       # [(0,1), (0,0)]---> [(0,0),(0,1)]  de baixo para cima para não haver overwrite
+            x,y=key
+            if y<ind:                               #se esta a cima da linha apagada
+                newKey=(x,y+inc)                    #shift para baixo
+                locked[newKey]= locked.pop(key)
+    return inc
+
 
 def draw_next_shape(shape, surface):
-    pass
+    font = pygame.font.SysFont('arial',30)
+    label =font.render('Next shape',1,(255,255,255))
 
-def draw_window(surface,grid):
+    sx = top_left_x + play_width +50
+    sy= top_left_y + play_height/2 -100
+    format =shape.shape[shape.rotation %len(shape.shape)]
+
+    for i ,line in enumerate(format):
+        row= list(line)
+        for j,column in enumerate(row):
+            if column =='0':
+                pygame.draw.rect(surface,shape.color,(sx+j*block_size,sy+i*block_size,block_size,block_size),0)
+
+    surface.blit(label,(sx+10,sy-30))
+
+
+def draw_window(surface,grid,score=0):
     surface.fill((0, 0, 0))
 
     pygame.font.init()
     font = pygame.font.SysFont('arial', 60)
     label = font.render('Best Game Ever', 1, (255, 255, 255))  # text
     surface.blit(label, (top_left_x + play_width / 2 - label.get_width() / 2, 30))  # memoria
+
+    font = pygame.font.SysFont('arial', 30)
+    label = font.render('Score : '+ str(score), 1, (255, 255, 255))
+
+    sx = top_left_x + play_width + 50
+    sy = top_left_y + play_height / 2 - 100
+
+    surface.blit(label,(sx+20,sy + 160))
 
     for i in range(len(grid)):
         for j in range(len(grid[i])):
@@ -233,7 +273,6 @@ def draw_window(surface,grid):
     pygame.draw.rect(surface, (128,0,128), (top_left_x,top_left_y,play_width, play_height), 4)
 
     draw_grid(surface,grid)
-    pygame.display.update()
 
 def main(win):
 
@@ -247,11 +286,20 @@ def main(win):
     clock= pygame.time.Clock()
     fall_time=0
     fall_speed= 0.27
+    level_time=0
+    score=0
 
     while run:
         grid =create_grid(locked_positions)
         fall_time += clock.get_rawtime()            #qto tempo passou desde o ultimo tick ---> ms
+        level_time+= clock.get_rawtime()
         clock.tick()
+
+        #increases the speed of the piece during the game
+        if level_time/1000>5:
+            level_time=0
+            if fall_speed> 0.12:
+                fall_speed-=0.005
 
         if fall_time/1000 >fall_speed:
             fall_time=0
@@ -295,8 +343,11 @@ def main(win):
             current_piece=next_piece
             next_piece= get_shape()
             change_piece=False
+            score+= clear_rows(grid,locked_positions)*10
 
-        draw_window(win,grid)
+        draw_window(win,grid,score)
+        draw_next_shape(next_piece, win)
+        pygame.display.update()
         if check_lost(locked_positions):
             run=False
 
